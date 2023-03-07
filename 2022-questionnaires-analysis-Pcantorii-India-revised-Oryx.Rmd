@@ -1,0 +1,140 @@
+---
+title: "Interview_Data_Pcantorii"
+author: "FCB", "AJ", "AVA", "PB"
+date: "27/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Analysing categorical data from Structured Interviews
+
+This script is to analyse data obtained through structured interviews in various wards of Kerala, India to systematically record the sightings of the rare Asian Giant Softshell Turtle Pelochelys cantorii and assess local ecological knowledge about the species.
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(questionr)
+library(ggplot2)
+library(scales)
+```
+## Reading xls file
+
+```{r}
+#reading xl file
+clean_data <- read_xlsx("Data/Interviews_master_clean.xlsx")
+
+#inspect first row
+head(clean_data)
+```
+## Setting categorical variables as factors
+
+```{r}
+## replace 0 and 1 with "Seen" and "Not_seen"
+clean_data$Seen_CGST <- ifelse(test=clean_data$Seen_CGST == 0, yes="Not_seen", no="Seen")
+clean_data$Subsistence_fishing <- ifelse(test=clean_data$Subsistence_fishing == 0, yes="No", no="Yes")
+clean_data$Irrigation <- ifelse(test=clean_data$Irrigation == 0, yes="No", no="Yes")
+clean_data$Washig <- ifelse(test=clean_data$Washig == 0, yes="No", no="Yes")
+clean_data$Bathe <- ifelse(test=clean_data$Bathe == 0, yes="No", no="Yes")
+
+# set months a string abbreviations and convert to  factor
+# First change from char to int
+clean_data$Month_seen <-as.integer(clean_data$Month_seen)
+clean_data$Month_seen_str <- month.abb[clean_data$Month_seen]
+
+# Now subset only the variables we are interested in
+data <-clean_data[ ,c(7,8,10,11, 12, 13, 14,15)]
+```
+#count the number of cases, UK and NAs per variable to see if we can use them in the model
+```{r}
+xtabs(~ Seen_CGST + Occupation, data=data) 
+xtabs(~ Seen_CGST + Subsistence_fishing, data=data)
+xtabs(~ Seen_CGST + River_usage, data=data)
+xtabs(~ Seen_CGST + Irrigation, data = data)
+xtabs(~ Seen_CGST + Washig, data = data)
+xtabs(~ Seen_CGST + Bathe, data = data)
+
+# Remove NAs and UAs
+data <- filter(data, data$Occupation != "NA" & data$Occupation != "UA")
+```
+## Converting categorical variables into factors
+```{r}
+data$Seen_CGST <- as.factor(data$Seen_CGST)
+data$Occupation <- as.factor(data$Occupation)
+data$River_usage <-as.factor(data$River_usage)
+data$Subsistence_fishing <- as.factor(data$Subsistence_fishing)
+```
+
+## Logistic regression Sightings versus Age
+```{r}
+m1 <- glm(Seen_CGST ~ Age, data = data, family = "binomial")
+summary(m1)
+```
+## Calculating Odds Ratio for m1 at 95% CI
+```{r}
+odd_ratio_m1 <- odds.ratio(m1, level = 0.95)
+```
+## Logistic regression Sighting versus Subsistence_fishing + Irrigation + Washig + Bathe
+```{r}
+log1<- glm(Seen_CGST ~ Subsistence_fishing + Irrigation + Washig + Bathe, data= data, family = "binomial")
+summary(log1)
+```
+## calculate odds ration for log1 at 95% CI
+
+```{r}
+odd_ratio_log1 <- odds.ratio(log1, level = 0.95)
+
+```
+
+Model selection
+
+```{r}
+library(MASS)
+initial <- glm(Seen_CGST~1, data = data, family = "binomial")
+full.mod <- glm(Seen_CGST~Age +Subsistence_fishing + Irrigation + Washig + Bathe, data = data, family = "binomial")
+
+#forward selection
+forward <- stepAIC(initial, direction = "forward", scope = list(upper = ~Age+Subsistence_fishing+Irrigation+Washig+Bathe, lower=~1))
+
+#backward selection
+backward <- stepAIC(full.mod, direction = "backward", scope = list(upper = ~Age+Subsistence_fishing+Irrigation+Washig+Bathe, lower=~1))
+
+#bidirectional selection
+bidirection <- stepAIC(initial, direction = "both", scope = list(upper = ~Age+Subsistence_fishing+Irrigation+Washig+Bathe, lower=~1))
+
+#best fit model
+best.mod <- glm(Seen_CGST~Subsistence_fishing+Age+Irrigation+Bathe, data = data, family = "binomial")
+summary(best.mod)
+final.mod <- glm(Seen_CGST~Subsistence_fishing+Age+Irrigation, data = data, family = "binomial")
+summary(final.mod)
+#although "best.mod" is slightly better based on the AIC score and Residual deviance, bathing was not included in the final model as the number of respondents using the river for bathing was low (n=9) and the respondents using the river for bathing were associated with other activities. Furthermore, bathing was not statistically significant (p>0.05) and adding bathing to the model reduced the AIC by a very small amount (0.72).
+
+#anova test
+anova(initial, final.mod, test = "Chi")
+```
+
+Checking model assumptions for final.mod
+
+```{r}
+library(DHARMa)
+resid <- simulateResiduals(final.mod)
+plot(resid)
+
+#The final model diagnostics show that the assumption of linearity, homogeneity of variance and normality is met. 
+```
+
+```{r}
+library(sjPlot)
+set_theme(base = theme_classic(),
+          axis.title.size = 3.5,
+          axis.textsize.x = 1.8,
+          axis.textsize.y = 1.8,
+          )
+plot_model(final.mod, type = "pred", 
+           axis.title = c("Age", "Probability of Sighting"), 
+           title = "")
+
+```
+
