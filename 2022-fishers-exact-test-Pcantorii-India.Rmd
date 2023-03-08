@@ -1,0 +1,62 @@
+---
+title: "Fisher's exact test"
+author: "AJ"
+date: "27/02/2022"
+output: html_notebook
+---
+# Performing fisher's exact test
+This script is to perform fisher's exact test to test association between habitat type, seasonality and time of the day with sighting of P cantorii. 
+
+```{r}
+library(rcompanion)
+library(Matrix)
+```
+
+## fisher's exact test for association between Habitat type and sighting
+
+```{r}
+Input =("
+Frequency Seen Not_Seen
+Isolated_Pool 31 46
+Flowing_river 33 44
+        ")
+Matriz = as.matrix(read.table(textConnection(Input),
+                              header=TRUE,
+                              row.names=1))
+Matriz
+fisher.test(Matriz, alternative="two.sided")
+```
+## fisher's exact test for association between seasonality and sighting
+```{r}
+Input =("
+Frequency Seen Not_Seen
+Dry_season 40 33
+Monsoon 7 66
+        ")
+Matriz_2 = as.matrix(read.table(textConnection(Input),
+                              header=TRUE,
+                              row.names=1))
+Matriz_2
+fisher.test(Matriz_2,
+            alternative="two.sided")
+
+
+
+```
+## fisher's exact test for association between time of the day and sighting
+```{r}
+Input =("
+Frequency Seen Not_Seen
+Day 70 64
+Night 18 116
+        ")
+Matriz_3 = as.matrix(read.table(textConnection(Input),
+                              header=TRUE,
+                              row.names=1))
+Matriz_3
+fisher.test(Matriz_3,
+            alternative="two.sided")
+
+
+```
+
